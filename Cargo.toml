@@ -1,0 +1,14 @@
+[package]
+name = "biturbo_spiral"
+version = "0.1.0"
+edition = "2024"
+description = "Spiral syntax highlighting for the Fork git client's diff views"
+license = "Apache-2.0"
+authors = ["i574n"]
+
+[lib]
+path = "src/lib.rs"
+crate-type = ["cdylib", "rlib"]
+
+[profile.release]
+panic = "unwind"
