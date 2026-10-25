@@ -10,15 +10,15 @@ pwsh install.ps1 -ForkDir <dir>   # a Fork that scoop doesn't manage
 ```
 
 Run it again after every `scoop update fork`. Each run rebuilds from the originals it saved, so it can run any number
-of times. It needs Rust, the .NET 10 SDK and `deps/spiral`, which `pwsh scripts/init.ps1` links to a spiral checkout
-next to this one (cloning [i574n/spiral](https://github.com/i574n/spiral) there if there is none). Its `lib/spiral` is
-the tokenizer's test corpus.
+of times. It needs Rust and `deps/spiral`, which `pwsh scripts/init.ps1` links to a spiral checkout next to this one
+(cloning [i574n/spiral](https://github.com/i574n/spiral) there if there is none). Its `lib/spiral` is the tokenizer's
+test corpus.
 
 ## Testing against a Fork release
 
 ```powershell
 pwsh test-fork.ps1                  # newest release in Fork's update feed
-pwsh test-fork.ps1 -Version 2.15.3  # a specific release
+pwsh test-fork.ps1 -Version 2.23.1  # a specific release from the feed
 ```
 
 `test-fork.ps1` downloads the release from Fork's update CDN, checks its SHA-1 and extracts it to a temporary folder.
@@ -27,8 +27,8 @@ loaded both the proxy and `biturbo_original.dll` from its own folder. The launch
 With `-BinDir <dir>` it then copies the verified binaries to `<dir>/fork-<version>`.
 
 `pwsh scripts/workflow.ps1` is what CI runs (`.github/workflows/gh-pages.yml`, on Windows): `build.ps1` tests the
-newest release and 2.15.3, the last unpacked `Fork.exe`, into `bin/`, and `scripts/publish.ps1` renders the source
-tree plus those binaries into `dist`, which is uploaded as the `gh-pages` artifact and published to GitHub Pages.
+newest release into `bin/`, and `scripts/publish.ps1` renders the source tree plus those binaries into `dist`, which is
+uploaded as the `gh-pages` artifact and published to GitHub Pages.
 
 ## How it works
 
@@ -39,11 +39,11 @@ tree plus those binaries into `dist`, which is uploaded as the `gh-pages` artifa
   from the installed DLL's export table, so each Fork version gets its own list. They need `rust-lld`
   (`.cargo/config.toml`), because `link.exe` doesn't create forwarders. `target/release/verify.exe <fork-dir>` checks
   that every original export is present and that Spiral and Rust both highlight.
-- **Font size.** When `Fork.exe` is a plain .NET assembly (2.15), `patcher/patch.cs` lowers the Preferences minimum
-  (`CodeEditorMinFontSize`, default here 1). It keeps `Fork.exe.orig`. From 2.23 on, `Fork.exe` is packed. The patcher
-  leaves it alone, and `-FontSize` writes the size to `settings.json` instead: Fork 2.23 keeps a smaller stored value,
-  and only typing into the Preferences font box resets it to 10.
+- **Font size.** Fork's Preferences box stops at 10, but Fork keeps a smaller `CodeEditorFontSize` stored in
+  `settings.json`. `-FontSize` writes it while Fork is closed. Typing into the Preferences font box resets it to 10.
 
 Fork's 9 highlight styles are fixed per theme. Keywords, symbol keywords and number suffixes use Keyword. Uppercase
 names and macro type variables use Type. Unary operators use Command. Escapes and `///>` directives use Attribute.
-Macro term variables use Variable. Symbols (`.name`) use Value. Numbers and booleans use Number.
+Macro term variables use Variable. Symbols (`.name`) use Value. Numbers and booleans use Number. In the dark theme
+keywords use Value instead (`src/theme.rs`): Keyword's dark blue is hard to read on added lines, and Value's light green
+is as readable as the light theme's red Keyword.

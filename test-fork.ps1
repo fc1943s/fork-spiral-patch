@@ -8,10 +8,42 @@ $ErrorActionPreference = 'Stop'
 if ($BinDir) { $BinDir = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($BinDir) }
 $feed = 'https://fork.dev/update/win/RELEASES'
 $cdn = 'https://cdn.fork.dev/update/win'
-$sha1MissingFromFeed = @{ '2.15.3' = '3F57C686B1A446CDD560825677D518E13BF01996' }
 $modulesLoadedFromForkDir = 'biturbo.dll', 'biturbo_original.dll'
 
 function Get-Sha1([string]$Path) { (Get-FileHash -LiteralPath $Path -Algorithm SHA1).Hash }
+
+function Get-VisibleWindowTitles([int]$ProcessId) {
+    if (-not ('ProcessWindows' -as [type])) {
+        Add-Type -TypeDefinition @'
+using System;
+using System.Collections.Generic;
+using System.Runtime.InteropServices;
+using System.Text;
+public static class ProcessWindows {
+    delegate bool EnumWindowsProc(IntPtr window, IntPtr parameter);
+    [DllImport("user32.dll")] static extern bool EnumWindows(EnumWindowsProc callback, IntPtr parameter);
+    [DllImport("user32.dll")] static extern uint GetWindowThreadProcessId(IntPtr window, out uint processId);
+    [DllImport("user32.dll")] static extern bool IsWindowVisible(IntPtr window);
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    static extern int GetWindowText(IntPtr window, StringBuilder text, int length);
+    public static List<string> VisibleTitles(uint processId) {
+        var titles = new List<string>();
+        EnumWindows((window, _) => {
+            GetWindowThreadProcessId(window, out var owner);
+            if (owner == processId && IsWindowVisible(window)) {
+                var text = new StringBuilder(512);
+                GetWindowText(window, text, text.Capacity);
+                titles.Add(text.ToString());
+            }
+            return true;
+        }, IntPtr.Zero);
+        return titles;
+    }
+}
+'@
+    }
+    [ProcessWindows]::VisibleTitles($ProcessId)
+}
 
 New-Item -ItemType Directory -Force -Path $Root | Out-Null
 $Root = (Resolve-Path -LiteralPath $Root).Path
@@ -27,10 +59,9 @@ $release = if ($Version -eq 'latest') {
 } else {
     $releases | Where-Object Version -eq ([version]$Version) | Select-Object -First 1
 }
-if (-not $release -and $Version -eq 'latest') { throw "No full package listed in $feed." }
-$resolved = $release ? $release.Version.ToString() : $Version
-$sha1 = $release ? $release.Sha1 : $sha1MissingFromFeed[$resolved]
-if (-not $sha1) { throw "Fork $resolved is not listed in $feed and has no known SHA-1." }
+if (-not $release) { throw "Fork $Version is not listed in $feed." }
+$resolved = $release.Version.ToString()
+$sha1 = $release.Sha1
 Write-Host "Fork $resolved (sha1 $sha1)"
 
 $package = Join-Path $Root "Fork-$resolved-full.nupkg"
@@ -56,10 +87,26 @@ foreach ($run in 1..2) {
     & $install -ForkDir $forkDir
 }
 
+$sampleRepo = Join-Path $Root 'sample-repo'
+if (Test-Path -LiteralPath $sampleRepo) { Remove-Item -LiteralPath $sampleRepo -Recurse -Force }
+New-Item -ItemType Directory -Path $sampleRepo | Out-Null
+$sampleFiles = @{ 'main.spi' = 'inl f x = x + 1i32'; 'main.rs' = 'fn main() { let x = 1; }' }
+foreach ($name in $sampleFiles.Keys) {
+    Set-Content -LiteralPath (Join-Path $sampleRepo $name) -Value $sampleFiles[$name]
+}
+git -C $sampleRepo init -q
+git -C $sampleRepo add .
+git -C $sampleRepo -c user.name=fork-spiral-patch -c user.email=fork-spiral-patch@localhost commit -q -m sample
+if ($LASTEXITCODE -ne 0) { throw "git commit in $sampleRepo failed ($LASTEXITCODE)." }
+foreach ($name in $sampleFiles.Keys) {
+    Add-Content -LiteralPath (Join-Path $sampleRepo $name) -Value $sampleFiles[$name]
+}
+
 if (Get-Process Fork -ErrorAction SilentlyContinue) {
     throw 'Close every other Fork first: the launch check needs the Fork under test to be the only one.'
 }
-$fork = Start-Process -FilePath (Join-Path $forkDir 'Fork.exe') -WorkingDirectory $forkDir -PassThru
+$fork = Start-Process -FilePath (Join-Path $forkDir 'Fork.exe') -ArgumentList "`"$sampleRepo`"" `
+    -WorkingDirectory $forkDir -PassThru
 try {
     $deadline = [DateTime]::UtcNow.AddSeconds($LaunchTimeoutSeconds)
     $loaded = @()
@@ -68,7 +115,9 @@ try {
             throw "Fork $resolved exited ($($fork.ExitCode)) before loading $($modulesLoadedFromForkDir -join ' and ')."
         }
         if ([DateTime]::UtcNow -gt $deadline) {
-            throw "Fork $resolved loaded only [$($loaded -join ', ')] from $forkDir within $LaunchTimeoutSeconds s."
+            $windows = (Get-VisibleWindowTitles $fork.Id) -join ' | '
+            throw ("Fork $resolved loaded only [$($loaded -join ', ')] from $forkDir within $LaunchTimeoutSeconds s " +
+                "with $sampleRepo open; visible windows: [$windows].")
         }
         $fork.Refresh()
         $modules = @(try { $fork.Modules } catch [ComponentModel.Win32Exception] { })

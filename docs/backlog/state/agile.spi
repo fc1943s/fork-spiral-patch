@@ -1,0 +1,49 @@
+union task_kind =
+    | Epic :: task_kind
+    | Feature :: task_kind
+    | Story :: task_kind
+    | TaskKind :: task_kind
+
+union priority =
+    | P0 :: priority | P1 :: priority | P2 :: priority | P3 :: priority | P4 :: priority | P5 :: priority
+
+union difficulty =
+    | D0 :: difficulty | D1 :: difficulty | D2 :: difficulty | D3 :: difficulty | D4 :: difficulty
+    | D5 :: difficulty | D6 :: difficulty | D7 :: difficulty | D8 :: difficulty
+
+union task_status =
+    | Planned :: task_status | Active :: task_status | Blocked :: task_status | Paused :: task_status | Done :: task_status
+
+union agile_item =
+    | Task :: string * string * task_kind * priority * difficulty * u32 * task_status * string * string * string * string -> agile_item
+
+union task_load =
+    | Light :: task_load | Medium :: task_load | Heavy :: task_load
+
+union task_assignee =
+    | Agent :: task_assignee | Pair :: task_assignee | User :: task_assignee
+
+union planned_estimate =
+    | Unestimated :: planned_estimate | Minutes :: u32 -> planned_estimate
+
+union planned_load =
+    | LoadUnset :: planned_load | Load :: task_load -> planned_load
+
+union planned_assignee =
+    | Unassigned :: planned_assignee | Assigned :: task_assignee -> planned_assignee
+
+union task_planning =
+    | Planning :: string * planned_estimate * planned_load * planned_assignee -> task_planning
+
+union task_note =
+    | Note :: string * u32 * string * string * string -> task_note
+
+inl main () : i32 = 0i32
+inl fork_spiral () = Task ("FORK-SPIRAL", "Fork git client: Spiral diff highlighting and diff fonts below 10 (spiral/apps/fork)", Feature, P1, D4, 100u32, Done, "", "tooling,editor,fork", "current", "current")
+inl planning_of_fork_spiral () = Planning ("FORK-SPIRAL", Minutes 180u32, Load Light, Assigned Agent)
+inl note_of_fork_spiral_1 () = Note ("FORK-SPIRAL", 1u32, "2026-10-25T02:13Z", "user", "2026-10-24 22:13 user request (session i574n_2): patch Fork for Spiral coloring (from the zed/vscode extensions) and an unlimited diff font minimum, reapplied on Fork updates")
+inl note_of_fork_spiral_2 () = Note ("FORK-SPIRAL", 2u32, "2026-10-25T02:13Z", "main-thread", "2026-10-24 22:13 done: Fork colors diffs natively (biturbo.dll bt_highlight_syntax, 9 fixed styles); apps/fork installs a proxy biturbo.dll (Rust, tokenizer ported from the compiler's line tokenizer, both editions, lexer state across lines) that forwards every other export to biturbo_original.dll via build.rs-generated .def forwarders (rust-lld; link.exe 14.44 makes none); the font cap is GeneralUserControl.CodeEditorMinFontSize=10, IL-patched with Mono.Cecil when Fork.exe is plain .NET (2.15.3); Fork 2.23.2 (updated tonight) ships a ConfuserEx-packed Fork.exe, left untouched: 2.23 keeps a smaller stored CodeEditorFontSize and clamps only when the Preferences font box is typed into, so install.ps1 -FontSize writes settings.json; verified live on 2.15.3 and 2.23.2 (screenshots, UIA), verify.exe checks exports+ABI; reapply = pwsh spiral/apps/fork/install.ps1 [-Restart] after scoop update fork")
+inl fork_spiral_spi () = Task ("FORK-SPIRAL-SPI", "fork-spiral-patch: rewrite the Rust crate as Spiral compiled to Rust (spi->rs), reusing lib/spiral and apps/compiler/spi tokens.spi, tests as Spiral test blocks under Cells, following x and tibia", Feature, P1, D5, 0u32, Planned, "FORK-SPIRAL", "tooling,editor,fork,spiral,dogfood", "current", "current")
+inl planning_of_fork_spiral_spi () = Planning ("FORK-SPIRAL-SPI", Minutes 480u32, Load Medium, Assigned Agent)
+inl note_of_fork_spiral_spi_1 () = Note ("FORK-SPIRAL-SPI", 1u32, "2026-10-25T05:19Z", "main-thread", "user 2026-10-25 request: rewrite the rs projects to spi->rs to dogfood spiral tooling, learn from x and tibia. Milestones: M1 Spiral package + build.ps1 BuildSpiral emitting the highlighter crate; M2 line driver, macro body and Fork style/theme mapping in Spiral with the 16 lexer cases, corpus and theme cases as test blocks green under Cells; M3 generated Rust replaces lexer.rs/highlight.rs/theme.rs, install + verify green on Fork 2.23.2, gh-pages CI green; M4 pe/build/verify in Spiral where the compiler allows. Rules written before measuring: R1 the current Rust highlighter is the oracle, the Spiral one replaces it only at zero span differences on the 16 cases and on every lib/spiral file; R2 reuse tokens.spi lexers where spans match, strict LexError means skip one char; R3 C ABI exports and Win32 calls stay a thin hand-written shim only if a probe compile shows Spiral cannot emit them as one-call primitives; R4 every generated crate under 1000 lines else split by hand; R5 Done needs green gh-pages CI.")
+inl note_of_fork_spiral_spi_2 () = Note ("FORK-SPIRAL-SPI", 2u32, "2026-10-25T05:43Z", "main-thread", "M1 probes (scratch package, edition 3, installed single-flight compiler): including ../deps/spiral/apps/compiler/spi- as a package works, tokens.lex_var compiles to Rust in 19-25 s (708 generated lines for lex_var alone, so R4 needs a hand split); global with a #[unsafe(no_mangle)] pub extern C fn is hoisted to the top and calls the exported pub fn; rustc +nightly-2026-10-18 --crate-type cdylib builds it and the symbol is exported. !!!!Export of array (i32 * i32) -> array (i32 * i32 * i32) generates pub fn(Rc<RefCell<Vec<(i32, i32)>>>) -> Rc<RefCell<Vec<(i32, i32, i32)>>>, so the C ABI shim only copies ranges in and spans out (R3: no encoded strings). Rust backend facts: char is u8 and string offsets are bytes, so spans are bytes and the boundary converts to UTF-16; every generated .rs has string_slice that calls abort/exit(3) on a bad index, which would kill Fork, so the driver never slices off code point boundaries. Template: x (per-crate Cargo.toml with package.metadata.spiral entry/output, BuildSpiral loop, 1000-line gate, committed .rs).")

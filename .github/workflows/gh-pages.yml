@@ -18,9 +18,7 @@ jobs:
 
       - uses: actions/setup-dotnet@v5.4.0
         with:
-          dotnet-version: |
-            9.0.202
-            10.0.402
+          dotnet-version: "9.0.202"
 
       - run: pwsh scripts/workflow.ps1
 

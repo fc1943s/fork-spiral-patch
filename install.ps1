@@ -1,13 +1,11 @@
 param(
     [string]$ForkDir,
-    [double]$MinFontSize = 1.0,
     [double]$FontSize = 0,
     [switch]$Restart
 )
 $ErrorActionPreference = 'Stop'
 Set-Location $PSScriptRoot
 $invariant = [cultureinfo]::InvariantCulture
-$unpatchableExitCode = 6
 $proxyMarker = 'biturbo_spiral_proxy'
 
 if (-not $ForkDir) {
@@ -55,15 +53,6 @@ try {
     if ($LASTEXITCODE -ne 0) { throw "The proxy in $ForkDir failed verification." }
 } finally {
     Remove-Item Env:BITURBO_ORIGINAL -ErrorAction SilentlyContinue
-}
-
-dotnet run (Join-Path $PSScriptRoot 'patcher/patch.cs') -- $ForkDir $MinFontSize.ToString($invariant)
-$fontCapRemoved = $LASTEXITCODE -eq 0
-if (-not $fontCapRemoved -and $LASTEXITCODE -ne $unpatchableExitCode) {
-    throw "Patching Fork.exe failed ($LASTEXITCODE)."
-}
-if (-not $fontCapRemoved) {
-    Write-Host 'Fork.exe is packed: the Preferences font box keeps its minimum of 10; -FontSize sets smaller sizes.'
 }
 
 if ($FontSize -gt 0) {

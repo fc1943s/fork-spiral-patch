@@ -1,6 +1,7 @@
 pub mod highlight;
 pub mod lexer;
 pub mod pe;
+pub mod theme;
 
 use std::collections::HashSet;
 use std::ffi::{c_char, c_void, CStr};
@@ -112,11 +113,12 @@ unsafe fn spiral_highlight(diff: *const c_char, ranges: *const BtRange, ranges_l
     } else {
         unsafe { std::slice::from_raw_parts(ranges, ranges_len as usize) }.iter().map(|r| (r.start, r.end)).collect()
     };
+    let theme = theme::current_theme();
     highlight::highlight(&text, &ranges)
         .into_iter()
         .map(|span| BtHighlightedRange {
             range_utf16: BtRange { start: span.start, end: span.end },
-            style: span.style as u8,
+            style: theme::themed(span.style, theme) as u8,
         })
         .collect()
 }

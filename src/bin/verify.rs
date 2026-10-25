@@ -1,5 +1,6 @@
 use biturbo_spiral::lexer::Style;
 use biturbo_spiral::pe::export_names;
+use biturbo_spiral::theme::{current_theme, themed};
 use biturbo_spiral::{BtHighlightedDiff, BtRange, ORIGINAL_FILE_NAME, PROXY_MARKER_EXPORT};
 use std::collections::BTreeSet;
 use std::ffi::{CString, c_char, c_void};
@@ -68,7 +69,8 @@ fn run(fork_dir: &Path) -> Result<(), String> {
     let release: ReleaseHighlightSyntax = unsafe { std::mem::transmute(release) };
     let (rust_count, _) = highlight_count(highlight, release, "src/main.rs", "fn main() { let x = 1; }")?;
     let (spiral_count, spiral_style) = highlight_count(highlight, release, "lib/main.spi", "inl f x = x + 1i32")?;
-    if rust_count == 0 || spiral_count == 0 || spiral_style != Style::Keyword as u8 {
+    let keyword_style = themed(Style::Keyword, current_theme()) as u8;
+    if rust_count == 0 || spiral_count == 0 || spiral_style != keyword_style {
         return Err(format!(
             "highlighting: rust {rust_count} spans, spiral {spiral_count} spans (first style {spiral_style})"
         ));
